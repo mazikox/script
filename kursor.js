@@ -1,52 +1,58 @@
 (function() {
-  "use strict";
+    "use strict";
 
-  // Główna funkcja uruchamiająca efekt 3D
-  function init3DCard() {
-    const cards = document.querySelectorAll(".pure-glass-card");
-    
-    cards.forEach(card => {
-      // Zabezpieczenie przed ponownym nałożeniem efektu (gdyby skrypt odpalił się dwa razy)
-      if (card.dataset.tiltInitialized === "true") return;
-      card.dataset.tiltInitialized = "true";
+    // 1. Pobieramy element skryptu, który właśnie się wykonuje
+    const myScript = document.currentScript;
+    let params = {};
 
-      card.addEventListener("mousemove", (e) => {
-        const rect = card.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-        const xc = rect.width / 2;
-        const yc = rect.height / 2;
-        const angleX = (yc - y) / 10;
-        const angleY = (x - xc) / 10;
-        
-        // Prawidłowe użycie backticków do przekazania zmiennych CSS
-        card.style.transform = `perspective(1000px) rotateX(${angleX}deg) rotateY(${angleY}deg) scale(1.02)`;
-        card.style.transition = "transform 0.1s ease";
-      });
-
-      card.addEventListener("mouseleave", () => {
-        card.style.transform = "perspective(1000px) rotateX(0deg) rotateY(0deg) scale(1)";
-        card.style.transition = "transform 0.5s ease";
-      });
-    });
-  }
-
-  // KROK 1: Próba natychmiastowego odpalenia (jeśli strona już się załadowała)
-  if (document.readyState === "complete" || document.readyState === "interactive") {
-    init3DCard();
-  } else {
-    document.addEventListener("DOMContentLoaded", init3DCard);
-  }
-
-  // KROK 2: Inteligentny "Asynchroniczny Detektor" (na wzór Mailerlite)
-  // Przez pierwsze 3 sekundy po załadowaniu skryptu, co 100 milisekund upewniamy się, 
-  // czy karta nie pojawiła się w strukturze kodu strony.
-  let attempts = 0;
-  const checkExist = setInterval(() => {
-    init3DCard();
-    attempts++;
-    if (attempts > 30) {
-      clearInterval(checkExist); // Wyłączamy detektor po 3 sekundach, by oszczędzać procesor
+    if (myScript && myScript.src) {
+        // Wyciągamy część po znaku '#' (hash) z adresu URL skryptu
+        const hashParts = myScript.src.split("#");
+        if (hashParts[1]) {
+            // Zamieniamy parametry typu klucz=wartosc&klucz2=wartosc2 na obiekt w JS
+            hashParts[1].split("&").forEach(part => {
+                const [key, value] = part.split("=");
+                if (key) {
+                    params[decodeURIComponent(key)] = decodeURIComponent(value || "");
+                }
+            });
+        }
     }
-  }, 100);
+
+    // Definiujemy zmienne z konfiguracji (z domyślnymi wartościami, jeśli nic nie podano)
+    const accountId = params.account || "brak-id";
+    const bgColor = params.color || "#3498db"; // domyślny niebieski
+
+    // 2. Funkcja renderująca nasz widget na stronie
+    function initWidget() {
+        // Szukamy naszych dedykowanych kontenerów na stronie
+        const placeholders = document.querySelectorAll(".moj-custom-widget");
+
+        placeholders.forEach(container => {
+            // Zabezpieczenie, żeby nie renderować widgetu wielokrotnie
+            if (container.getAttribute("data-loaded") === "true") return;
+
+            // Możemy też pobrać dodatkowy tekst bezpośrednio z atrybutu HTML diva!
+            const customText = container.getAttribute("data-text") || "Domyślny tekst widgetu.";
+
+            // Wstrzykujemy kod HTML bezpośrednio do środka diva
+            container.innerHTML = `
+                <div style="padding: 20px; background-color: ${bgColor}; color: white; border-radius: 8px; font-family: Arial, sans-serif; box-shadow: 0 4px 10px rgba(0,0,0,0.1); text-align: center;">
+                    <h3 style="margin-top: 0;">Mój Własny Widget! 🚀</h3>
+                    <p>${customText}</p>
+                    <small style="opacity: 0.8;">ID Twojego Konta: <strong>${accountId}</strong></small>
+                </div>
+            `;
+
+            // Oznaczamy kontener jako załadowany
+            container.setAttribute("data-loaded", "true");
+        });
+    }
+
+    // Uruchamiamy skrypt po załadowaniu struktury dokumentu DOM
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", initWidget);
+    } else {
+        initWidget();
+    }
 })();
