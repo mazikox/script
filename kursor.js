@@ -1,49 +1,57 @@
 (function() {
     "use strict";
+    console.log("🖱️ KURSOR.JS: Uruchamiam śledzenie myszy...");
 
-    // 1. Szukamy koloru przekazanego w adresie URL po "#color=" (dokładnie jak #account= w MailerLite)
-    let badgeColor = "#ff4757"; // Domyślny kolor (czerwony), jeśli nic nie podasz
-    const scripts = document.getElementsByTagName("script");
-    
-    for (let i = 0; i < scripts.length; i++) {
-        const src = scripts[i].src;
-        if (src && src.includes("badge.js")) {
-            const parts = src.split("#color=");
-            if (parts[1]) {
-                badgeColor = decodeURIComponent(parts[1]); // Wyciągamy kolor z linku
-            }
+    // Funkcja czekająca na gotowość strony
+    function domReady(callback) {
+        if (document.readyState !== "loading") {
+            callback();
+        } else {
+            document.addEventListener("DOMContentLoaded", callback);
         }
     }
 
-    // 2. Szukamy naszego kontenera HTML na stronie (klasa .my-custom-badge)
-    const containers = document.querySelectorAll(".my-custom-badge");
-    
-    containers.forEach(container => {
-        // Odczytujemy tekst, jaki wpisałeś w atrybucie data-message
-        const message = container.getAttribute("data-message") || "Kliknij mnie!";
+    domReady(function() {
+        console.log("📦 KURSOR.JS: Strona gotowa, tworzę nowy kursor.");
+
+        // 1. Ukrywamy domyślny kursor na całej stronie
+        document.body.style.cursor = "none";
+
+        // 2. Tworzymy nasz nowy kursor (małą kropkę)
+        const customCursor = document.createElement("div");
+        customCursor.style.width = "20px";
+        customCursor.style.height = "20px";
+        customCursor.style.background = "#2ed573"; // Możesz zmienić kolor
+        customCursor.style.borderRadius = "50%";
+        customCursor.style.position = "fixed";
+        customCursor.style.pointerEvents = "none"; // Bardzo ważne! Bez tego nie da się klikać przez kursor
+        customCursor.style.zIndex = "999999";
+        customCursor.style.transform = "translate(-50%, -50%)"; // Wyśrodkowanie kropki na grocie strzałki
+        customCursor.style.transition = "transform 0.1s ease-out"; // Płynne powiększanie
         
-        // Wstrzykujemy do środka ładnie ostylowany element HTML z animacją
-        container.innerHTML = `
-            <div style="
-                background: ${badgeColor};
-                color: white;
-                padding: 25px;
-                border-radius: 16px;
-                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                text-align: center;
-                box-shadow: 0 10px 25px rgba(0,0,0,0.15);
-                transition: all 0.3s ease;
-                cursor: pointer;
-                display: inline-block;
-                margin: 15px auto;
-                border: 2px solid rgba(255,255,255,0.2);
-            " 
-            onmouseover="this.style.transform='translateY(-5px)'; this.style.boxShadow='0 15px 30px rgba(0,0,0,0.25)';" 
-            onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 10px 25px rgba(0,0,0,0.15)';"
-            onclick="alert('Skrypt działa w 100% poprawnie!')">
-                <h3 style="margin: 0 0 8px 0; font-size: 20px; font-weight: 600; letter-spacing: 0.5px;">🚀 Sukces!</h3>
-                <p style="margin: 0; font-size: 14px; opacity: 0.95;">${message}</p>
-            </div>
-        `;
+        // Dodajemy kursor do strony
+        document.body.appendChild(customCursor);
+
+        // 3. Nasłuchujemy ruchu myszy (Główny silnik śledzenia)
+        document.addEventListener("mousemove", function(event) {
+            // event.clientX i event.clientY to dokładne współrzędne myszy na ekranie
+            customCursor.style.left = event.clientX + "px";
+            customCursor.style.top = event.clientY + "px";
+        });
+
+        // 4. Mały bajer - powiększanie kursora po najechaniu na linki
+        const links = document.querySelectorAll("a, button, [onclick]");
+        links.forEach(link => {
+            link.addEventListener("mouseenter", () => {
+                customCursor.style.transform = "translate(-50%, -50%) scale(1.8)";
+                customCursor.style.background = "#ff4757"; // Zmiana koloru na czerwony przy linku
+            });
+            link.addEventListener("mouseleave", () => {
+                customCursor.style.transform = "translate(-50%, -50%) scale(1)";
+                customCursor.style.background = "#2ed573"; // Powrót do zielonego
+            });
+            // Aby linki nie pokazywały standardowej łapki:
+            link.style.cursor = "none";
+        });
     });
 })();
