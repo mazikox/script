@@ -1,39 +1,28 @@
 (function () {
   "use strict";
 
+  /*
+   * ============================================================
+   * TRYB DEVELOPERSKI
+   * ============================================================
+   * true  = przycisk data-effect-toggle="bubbles" steruje efektem
+   * false = efekt jest zawsze włączony, przycisk jest ignorowany
+   */
+  const DEV_MODE = true;
+  const EFFECT_ID = "bubbles";
+  const STORAGE_KEY = `artsaas-dev-effect:${EFFECT_ID}`;
+
   const CONFIG = {
-    // Jak blisko kursora znajduje się centrum animacji.
     followStrength: 0.82,
-
-    // Bezwładność ruchu.
     momentum: 0.075,
-
-    // Przezroczystość całej animacji.
     opacity: 0.88,
-
-    // Maksymalna liczba klatek.
     fps: 60,
-
-    // Liczba kształtów na komputerze.
     bubbleCount: 18,
-
-    // Liczba kształtów na telefonie.
     mobileBubbleCount: 10,
-
-    // Maksymalna odległość tworzenia połączeń.
     connectionDistance: 190,
-
-    // Wielkość głównej poświaty.
     glowSize: 720,
-
-    // Długość świetlnego śladu kursora.
     trailLength: 8,
-
-    // Ogólna intensywność efektu.
     intensity: 1,
-
-    // Na ciemnych stronach: "screen".
-    // Na jasnych stronach można ustawić: "normal".
     blendMode: "screen"
   };
 
@@ -57,7 +46,8 @@
       pointerEvents: "none",
       zIndex: "2147483646",
       opacity: String(CONFIG.opacity),
-      mixBlendMode: CONFIG.blendMode
+      mixBlendMode: CONFIG.blendMode,
+      transition: "opacity 180ms ease"
     });
 
     document.body.appendChild(canvas);
@@ -71,6 +61,8 @@
       console.error(
         "[Bubble Effect] Przeglądarka nie obsługuje canvas."
       );
+
+      canvas.remove();
       return;
     }
 
@@ -96,18 +88,18 @@
         ? CONFIG.mobileBubbleCount
         : CONFIG.bubbleCount;
 
-    let width = window.innerWidth;
-    let height = window.innerHeight;
+    let width = Math.max(window.innerWidth, 1);
+    let height = Math.max(window.innerHeight, 1);
     let pixelRatio = 1;
 
     let currentX = width / 2;
     let currentY = height / 2;
 
-    let targetX = width / 2;
-    let targetY = height / 2;
+    let targetX = currentX;
+    let targetY = currentY;
 
-    let pointerX = width / 2;
-    let pointerY = height / 2;
+    let pointerX = currentX;
+    let pointerY = currentY;
 
     let previousPointerX = pointerX;
     let previousPointerY = pointerY;
@@ -118,7 +110,8 @@
     let pointerActive = false;
 
     let lastFrameTime = 0;
-    let animationPaused = false;
+    let animationPaused = document.hidden;
+    let effectEnabled = true;
 
     const trail = [];
     const shapes = [];
@@ -150,15 +143,17 @@
 
         if (typeRoll === 0) {
           type = "polygon";
-        }
-
-        if (typeRoll === 1) {
+        } else if (typeRoll === 1) {
           type = "ring";
         }
 
         shapes.push({
           type,
-          color: COLORS[index % COLORS.length],
+
+          color:
+            COLORS[
+              index % COLORS.length
+            ],
 
           angle: random(
             0,
@@ -169,7 +164,10 @@
             70,
             Math.min(
               360,
-              Math.max(width, height) * 0.32
+              Math.max(
+                width,
+                height
+              ) * 0.32
             )
           ),
 
@@ -215,8 +213,15 @@
     }
 
     function resizeCanvas() {
-      width = window.innerWidth;
-      height = window.innerHeight;
+      width = Math.max(
+        window.innerWidth,
+        1
+      );
+
+      height = Math.max(
+        window.innerHeight,
+        1
+      );
 
       pixelRatio = Math.min(
         window.devicePixelRatio || 1,
@@ -231,8 +236,11 @@
         height * pixelRatio
       );
 
-      canvas.style.width = `${width}px`;
-      canvas.style.height = `${height}px`;
+      canvas.style.width =
+        `${width}px`;
+
+      canvas.style.height =
+        `${height}px`;
 
       context.setTransform(
         pixelRatio,
@@ -260,10 +268,12 @@
 
     function updatePointerPhysics(delta) {
       const rawVelocityX =
-        pointerX - previousPointerX;
+        pointerX -
+        previousPointerX;
 
       const rawVelocityY =
-        pointerY - previousPointerY;
+        pointerY -
+        previousPointerY;
 
       pointerVelocityX +=
         (
@@ -277,18 +287,22 @@
           pointerVelocityY
         ) * 0.22;
 
-      previousPointerX = pointerX;
-      previousPointerY = pointerY;
+      previousPointerX =
+        pointerX;
+
+      previousPointerY =
+        pointerY;
 
       const rawSpeed = Math.hypot(
         pointerVelocityX,
         pointerVelocityY
       );
 
-      const normalizedSpeed = Math.min(
-        rawSpeed / 34,
-        1.5
-      );
+      const normalizedSpeed =
+        Math.min(
+          rawSpeed / 34,
+          1.5
+        );
 
       pointerSpeed +=
         (
@@ -302,8 +316,11 @@
         pointerSpeed *= 0.94;
       }
 
-      const centerX = width / 2;
-      const centerY = height / 2;
+      const centerX =
+        width / 2;
+
+      const centerY =
+        height / 2;
 
       if (pointerActive) {
         targetX =
@@ -311,14 +328,16 @@
           (
             pointerX -
             centerX
-          ) * CONFIG.followStrength;
+          ) *
+            CONFIG.followStrength;
 
         targetY =
           centerY +
           (
             pointerY -
             centerY
-          ) * CONFIG.followStrength;
+          ) *
+            CONFIG.followStrength;
       } else {
         targetX = centerX;
         targetY = centerY;
@@ -327,7 +346,8 @@
       const easing =
         1 -
         Math.pow(
-          1 - CONFIG.momentum,
+          1 -
+            CONFIG.momentum,
           delta
         );
 
@@ -360,23 +380,29 @@
     }
 
     function updateShapes(time) {
-      const normalizedX = pointerActive
-        ? pointerX / width - 0.5
-        : 0;
+      const normalizedX =
+        pointerActive
+          ? pointerX / width - 0.5
+          : 0;
 
-      const normalizedY = pointerActive
-        ? pointerY / height - 0.5
-        : 0;
+      const normalizedY =
+        pointerActive
+          ? pointerY / height - 0.5
+          : 0;
 
       const speedExpansion =
         1 +
         pointerSpeed * 0.28;
 
       shapes.forEach(
-        function (shape, index) {
+        function (
+          shape,
+          index
+        ) {
           const angle =
             shape.angle +
-            time * shape.speed +
+            time *
+              shape.speed +
             normalizedX *
               0.7 *
               shape.depth;
@@ -384,8 +410,8 @@
           const wave =
             Math.sin(
               time * 0.0012 +
-              shape.phase +
-              index
+                shape.phase +
+                index
             ) * 0.12;
 
           const orbit =
@@ -429,7 +455,7 @@
               1 +
               Math.sin(
                 time * 0.0017 +
-                shape.phase
+                  shape.phase
               ) * 0.1 +
               pointerSpeed * 0.16
             );
@@ -487,7 +513,8 @@
         "rgba(0, 0, 0, 0)"
       );
 
-      context.fillStyle = gradient;
+      context.fillStyle =
+        gradient;
 
       context.fillRect(
         0,
@@ -504,7 +531,8 @@
         index >= 0;
         index -= 1
       ) {
-        const point = trail[index];
+        const point =
+          trail[index];
 
         const progress =
           1 -
@@ -549,7 +577,8 @@
           "rgba(120, 80, 255, 0)"
         );
 
-        context.fillStyle = gradient;
+        context.fillStyle =
+          gradient;
 
         context.beginPath();
 
@@ -567,7 +596,6 @@
 
     function drawConnections() {
       context.save();
-
       context.lineWidth = 0.8;
 
       for (
@@ -576,7 +604,8 @@
         first += 1
       ) {
         for (
-          let second = first + 1;
+          let second =
+            first + 1;
           second < shapes.length;
           second += 1
         ) {
@@ -588,8 +617,10 @@
 
           const distance =
             Math.hypot(
-              shapeA.x - shapeB.x,
-              shapeA.y - shapeB.y
+              shapeA.x -
+                shapeB.x,
+              shapeA.y -
+                shapeB.y
             );
 
           const maxDistance =
@@ -643,6 +674,7 @@
             gradient;
 
           context.beginPath();
+
           context.moveTo(
             shapeA.x,
             shapeA.y
@@ -694,7 +726,9 @@
             angleDifference
           )
         ) *
-          (stretch - 1);
+          (
+            stretch - 1
+          );
 
       const stretchY =
         1 +
@@ -703,7 +737,9 @@
             angleDifference
           )
         ) *
-          (stretch - 1);
+          (
+            stretch - 1
+          );
 
       for (
         let index = 0;
@@ -724,8 +760,8 @@
             : 1 +
               Math.sin(
                 time * 0.002 +
-                shape.phase +
-                index * 1.73
+                  shape.phase +
+                  index * 1.73
               ) *
                 shape.wobble;
 
@@ -766,7 +802,8 @@
           }
         );
       } else {
-        const first = points[0];
+        const first =
+          points[0];
 
         const last =
           points[
@@ -996,7 +1033,6 @@
 
       context.lineWidth = 1.2;
       context.stroke();
-
       context.restore();
     }
 
@@ -1093,21 +1129,17 @@
                 shape,
                 time
               );
-              return;
-            }
-
-            if (
+            } else if (
               shape.type ===
               "ring"
             ) {
               drawRing(shape);
-              return;
+            } else {
+              drawBubble(
+                shape,
+                time
+              );
             }
-
-            drawBubble(
-              shape,
-              time
-            );
           }
         );
     }
@@ -1148,6 +1180,7 @@
       );
 
       context.fillStyle = glow;
+
       context.beginPath();
 
       context.arc(
@@ -1195,7 +1228,7 @@
           1 +
           Math.sin(
             time * 0.002 +
-            index * 1.4
+              index * 1.4
           ) *
             0.08 +
           pointerSpeed * 0.08;
@@ -1230,18 +1263,221 @@
 
       context.lineWidth = 1;
       context.stroke();
-
       context.restore();
     }
+
+    /*
+     * ============================================================
+     * LOGIKA PANELU DEVELOPERSKIEGO
+     * ============================================================
+     */
+
+    function findDevButtons() {
+      return document.querySelectorAll(
+        `[data-effect-toggle="${EFFECT_ID}"]`
+      );
+    }
+
+    function updateDevButtons() {
+      const buttons =
+        findDevButtons();
+
+      buttons.forEach(
+        function (button) {
+          button.setAttribute(
+            "aria-pressed",
+            String(
+              effectEnabled
+            )
+          );
+
+          const status =
+            button.querySelector(
+              "[data-effect-status]"
+            );
+
+          if (status) {
+            status.textContent =
+              effectEnabled
+                ? "ON"
+                : "OFF";
+          }
+        }
+      );
+    }
+
+    function readSavedState() {
+      if (!DEV_MODE) {
+        return true;
+      }
+
+      try {
+        const savedValue =
+          localStorage.getItem(
+            STORAGE_KEY
+          );
+
+        return savedValue === null
+          ? true
+          : savedValue === "true";
+      } catch (error) {
+        return true;
+      }
+    }
+
+    function saveState() {
+      if (!DEV_MODE) {
+        return;
+      }
+
+      try {
+        localStorage.setItem(
+          STORAGE_KEY,
+          String(
+            effectEnabled
+          )
+        );
+      } catch (error) {
+        // localStorage może być zablokowany.
+      }
+    }
+
+    function setEffectEnabled(
+      enabled,
+      persist
+    ) {
+      effectEnabled =
+        DEV_MODE
+          ? Boolean(enabled)
+          : true;
+
+      canvas.style.visibility =
+        effectEnabled
+          ? "visible"
+          : "hidden";
+
+      canvas.style.opacity =
+        effectEnabled
+          ? String(
+            CONFIG.opacity
+          )
+          : "0";
+
+      if (!effectEnabled) {
+        context.clearRect(
+          0,
+          0,
+          width,
+          height
+        );
+
+        trail.length = 0;
+      } else {
+        lastFrameTime =
+          performance.now();
+      }
+
+      updateDevButtons();
+
+      if (persist) {
+        saveState();
+      }
+    }
+
+    function initializeDevControls() {
+      setEffectEnabled(
+        readSavedState(),
+        false
+      );
+
+      if (!DEV_MODE) {
+        return;
+      }
+
+      document.addEventListener(
+        "click",
+        function (event) {
+          if (
+            !(
+              event.target instanceof
+              Element
+            )
+          ) {
+            return;
+          }
+
+          const button =
+            event.target.closest(
+              `[data-effect-toggle="${EFFECT_ID}"]`
+            );
+
+          if (!button) {
+            return;
+          }
+
+          event.preventDefault();
+
+          setEffectEnabled(
+            !effectEnabled,
+            true
+          );
+        }
+      );
+    }
+
+    /*
+     * Opcjonalne ręczne sterowanie z konsoli:
+     *
+     * ArtSaaSFX.bubbles.enable()
+     * ArtSaaSFX.bubbles.disable()
+     * ArtSaaSFX.bubbles.toggle()
+     * ArtSaaSFX.bubbles.isEnabled()
+     */
+
+    window.ArtSaaSFX =
+      window.ArtSaaSFX || {};
+
+    window.ArtSaaSFX[
+      EFFECT_ID
+    ] = {
+      enable: function () {
+        setEffectEnabled(
+          true,
+          DEV_MODE
+        );
+      },
+
+      disable: function () {
+        setEffectEnabled(
+          false,
+          DEV_MODE
+        );
+      },
+
+      toggle: function () {
+        setEffectEnabled(
+          !effectEnabled,
+          DEV_MODE
+        );
+      },
+
+      isEnabled: function () {
+        return effectEnabled;
+      }
+    };
 
     function render(timestamp) {
       requestAnimationFrame(
         render
       );
 
-      if (animationPaused) {
+      if (
+        animationPaused ||
+        !effectEnabled
+      ) {
         lastFrameTime =
           timestamp;
+
         return;
       }
 
@@ -1251,7 +1487,8 @@
           : CONFIG.fps;
 
       const frameInterval =
-        1000 / activeFps;
+        1000 /
+        activeFps;
 
       if (
         timestamp -
@@ -1261,16 +1498,18 @@
         return;
       }
 
-      const delta = Math.min(
-        Math.max(
-          (
-            timestamp -
-            lastFrameTime
-          ) / 16.6667,
-          0.5
-        ),
-        3
-      );
+      const delta =
+        Math.min(
+          Math.max(
+            (
+              timestamp -
+              lastFrameTime
+            ) /
+              16.6667,
+            0.5
+          ),
+          3
+        );
 
       lastFrameTime =
         timestamp;
@@ -1352,6 +1591,12 @@
       }
     );
 
+    /*
+     * ArtSaaS może dynamicznie przebudowywać stronę.
+     * Observer pilnuje canvasa i aktualizuje przycisk,
+     * gdy panel zostanie dodany później.
+     */
+
     const observer =
       new MutationObserver(
         function () {
@@ -1363,6 +1608,10 @@
             document.body.appendChild(
               canvas
             );
+          }
+
+          if (DEV_MODE) {
+            updateDevButtons();
           }
         }
       );
@@ -1376,6 +1625,7 @@
     );
 
     resizeCanvas();
+    initializeDevControls();
 
     requestAnimationFrame(
       render
