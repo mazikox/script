@@ -3,131 +3,272 @@
 
   /*
    * ============================================================
-   * TRYB DEVELOPERSKI
+   * USTAWIENIA
    * ============================================================
-   * true  = przycisk data-effect-toggle="bubbles" steruje efektem
-   * false = efekt jest zawsze włączony, przycisk jest ignorowany
+   */
+
+  const VERSION = "2026.07.30-2";
+
+  /*
+   * true:
+   * panel developerski może włączać i wyłączać efekt.
+   *
+   * false:
+   * efekt jest zawsze aktywny, a panel zostaje usunięty.
    */
   const DEV_MODE = true;
+
   const EFFECT_ID = "bubbles";
-  const STORAGE_KEY = `artsaas-dev-effect:${EFFECT_ID}`;
+
+  const STORAGE_KEY =
+    `artsaas-dev-effect:${EFFECT_ID}`;
 
   const CONFIG = {
     followStrength: 0.82,
     momentum: 0.075,
-    opacity: 0.88,
+
+    opacity: 0.95,
     fps: 60,
+
     bubbleCount: 18,
     mobileBubbleCount: 10,
+
     connectionDistance: 190,
-    glowSize: 720,
+    glowSize: 620,
     trailLength: 8,
+
     intensity: 1,
-    blendMode: "screen"
+
+    /*
+     * "normal" jest widoczny na białym tle.
+     * "screen" nadaje się głównie do ciemnych stron.
+     */
+    blendMode: "normal"
   };
 
-  if (window.__globalBubbleEffectInitialized) {
+  /*
+   * ============================================================
+   * ZABEZPIECZENIE PRZED PODWÓJNYM URUCHOMIENIEM
+   * ============================================================
+   */
+
+  if (
+    window.__ARTSAAS_BUBBLE_FX__ &&
+    typeof window.__ARTSAAS_BUBBLE_FX__.rescanControls ===
+      "function"
+  ) {
+    window.__ARTSAAS_BUBBLE_FX__.rescanControls();
     return;
   }
 
-  window.__globalBubbleEffectInitialized = true;
-
   function initializeBubbleEffect() {
-    const canvas = document.createElement("canvas");
+    /*
+     * ==========================================================
+     * CANVAS
+     * ==========================================================
+     */
 
-    canvas.id = "global-bubble-effect";
-    canvas.setAttribute("aria-hidden", "true");
+    let canvas =
+      document.getElementById(
+        "global-bubble-effect"
+      );
 
-    Object.assign(canvas.style, {
-      position: "fixed",
-      inset: "0",
-      width: "100vw",
-      height: "100vh",
-      pointerEvents: "none",
-      zIndex: "2147483646",
-      opacity: String(CONFIG.opacity),
-      mixBlendMode: CONFIG.blendMode,
-      transition: "opacity 180ms ease"
-    });
+    if (!canvas) {
+      canvas =
+        document.createElement(
+          "canvas"
+        );
 
-    document.body.appendChild(canvas);
+      canvas.id =
+        "global-bubble-effect";
 
-    const context = canvas.getContext("2d", {
-      alpha: true,
-      desynchronized: true
-    });
+      canvas.setAttribute(
+        "aria-hidden",
+        "true"
+      );
+    }
+
+    Object.assign(
+      canvas.style,
+      {
+        position: "fixed",
+        inset: "0",
+
+        width: "100vw",
+        height: "100vh",
+
+        pointerEvents: "none",
+
+        /*
+         * Canvas jest pod panelem developerskim.
+         */
+        zIndex: "2147483600",
+
+        opacity:
+          String(CONFIG.opacity),
+
+        mixBlendMode:
+          CONFIG.blendMode,
+
+        transition:
+          "opacity 180ms ease",
+
+        visibility: "visible"
+      }
+    );
+
+    document.body.appendChild(
+      canvas
+    );
+
+    const context =
+      canvas.getContext(
+        "2d",
+        {
+          alpha: true,
+          desynchronized: true
+        }
+      );
 
     if (!context) {
       console.error(
-        "[Bubble Effect] Przeglądarka nie obsługuje canvas."
+        "[Bubble FX] Canvas nie jest obsługiwany."
       );
 
       canvas.remove();
       return;
     }
 
+    /*
+     * ==========================================================
+     * KOLORY I URZĄDZENIE
+     * ==========================================================
+     */
+
     const COLORS = [
-      [190, 116, 255],
-      [91, 206, 255],
-      [255, 107, 197],
-      [134, 255, 218],
-      [255, 179, 108]
+      [136, 73, 255],
+      [31, 157, 255],
+      [239, 64, 177],
+      [14, 190, 157],
+      [245, 133, 34]
     ];
 
-    const prefersReducedMotion = window.matchMedia(
-      "(prefers-reduced-motion: reduce)"
-    ).matches;
+    const prefersReducedMotion =
+      window.matchMedia(
+        "(prefers-reduced-motion: reduce)"
+      ).matches;
 
-    const isMobile = window.matchMedia(
-      "(pointer: coarse)"
-    ).matches;
+    const isMobile =
+      window.matchMedia(
+        "(pointer: coarse)"
+      ).matches;
 
-    const shapeCount = prefersReducedMotion
-      ? 7
-      : isMobile
-        ? CONFIG.mobileBubbleCount
-        : CONFIG.bubbleCount;
+    const shapeCount =
+      prefersReducedMotion
+        ? 7
+        : isMobile
+          ? CONFIG.mobileBubbleCount
+          : CONFIG.bubbleCount;
 
-    let width = Math.max(window.innerWidth, 1);
-    let height = Math.max(window.innerHeight, 1);
+    /*
+     * ==========================================================
+     * STAN ANIMACJI
+     * ==========================================================
+     */
+
+    let width =
+      Math.max(
+        window.innerWidth,
+        1
+      );
+
+    let height =
+      Math.max(
+        window.innerHeight,
+        1
+      );
+
     let pixelRatio = 1;
 
-    let currentX = width / 2;
-    let currentY = height / 2;
+    let currentX =
+      width / 2;
 
-    let targetX = currentX;
-    let targetY = currentY;
+    let currentY =
+      height / 2;
 
-    let pointerX = currentX;
-    let pointerY = currentY;
+    let targetX =
+      currentX;
 
-    let previousPointerX = pointerX;
-    let previousPointerY = pointerY;
+    let targetY =
+      currentY;
+
+    let pointerX =
+      currentX;
+
+    let pointerY =
+      currentY;
+
+    let previousPointerX =
+      pointerX;
+
+    let previousPointerY =
+      pointerY;
 
     let pointerVelocityX = 0;
     let pointerVelocityY = 0;
     let pointerSpeed = 0;
+
     let pointerActive = false;
 
     let lastFrameTime = 0;
-    let animationPaused = document.hidden;
+
+    let animationPaused =
+      document.hidden;
+
     let effectEnabled = true;
+
+    let controlScanScheduled =
+      false;
 
     const trail = [];
     const shapes = [];
 
+    /*
+     * ==========================================================
+     * FUNKCJE POMOCNICZE
+     * ==========================================================
+     */
+
     function random(min, max) {
-      return min + Math.random() * (max - min);
+      return (
+        min +
+        Math.random() *
+          (max - min)
+      );
     }
 
-    function rgba(color, alpha) {
-      return `rgba(
-        ${color[0]},
-        ${color[1]},
-        ${color[2]},
-        ${alpha}
-      )`;
+    function rgba(
+      color,
+      alpha
+    ) {
+      return (
+        "rgba(" +
+        color[0] +
+        "," +
+        color[1] +
+        "," +
+        color[2] +
+        "," +
+        alpha +
+        ")"
+      );
     }
+
+    /*
+     * ==========================================================
+     * KSZTAŁTY
+     * ==========================================================
+     */
 
     function createShapes() {
       shapes.length = 0;
@@ -137,13 +278,16 @@
         index < shapeCount;
         index += 1
       ) {
-        const typeRoll = index % 4;
+        const typeRoll =
+          index % 4;
 
         let type = "bubble";
 
         if (typeRoll === 0) {
           type = "polygon";
-        } else if (typeRoll === 1) {
+        } else if (
+          typeRoll === 1
+        ) {
           type = "ring";
         }
 
@@ -152,7 +296,8 @@
 
           color:
             COLORS[
-              index % COLORS.length
+              index %
+                COLORS.length
             ],
 
           angle: random(
@@ -163,7 +308,7 @@
           orbit: random(
             70,
             Math.min(
-              360,
+              350,
               Math.max(
                 width,
                 height
@@ -172,8 +317,8 @@
           ),
 
           speed: random(
-            -0.00032,
-            0.00032
+            -0.00033,
+            0.00033
           ),
 
           phase: random(
@@ -183,16 +328,17 @@
 
           size: random(
             24,
-            105
+            98
           ),
 
-          sides: Math.floor(
-            random(4, 8)
-          ),
+          sides:
+            Math.floor(
+              random(4, 8)
+            ),
 
           wobble: random(
             0.06,
-            0.18
+            0.17
           ),
 
           depth: random(
@@ -207,34 +353,47 @@
 
           x: currentX,
           y: currentY,
+
           renderedSize: 30
         });
       }
     }
 
+    /*
+     * ==========================================================
+     * ROZMIAR CANVAS
+     * ==========================================================
+     */
+
     function resizeCanvas() {
-      width = Math.max(
-        window.innerWidth,
-        1
-      );
+      width =
+        Math.max(
+          window.innerWidth,
+          1
+        );
 
-      height = Math.max(
-        window.innerHeight,
-        1
-      );
+      height =
+        Math.max(
+          window.innerHeight,
+          1
+        );
 
-      pixelRatio = Math.min(
-        window.devicePixelRatio || 1,
-        2
-      );
+      pixelRatio =
+        Math.min(
+          window.devicePixelRatio ||
+            1,
+          2
+        );
 
-      canvas.width = Math.round(
-        width * pixelRatio
-      );
+      canvas.width =
+        Math.round(
+          width * pixelRatio
+        );
 
-      canvas.height = Math.round(
-        height * pixelRatio
-      );
+      canvas.height =
+        Math.round(
+          height * pixelRatio
+        );
 
       canvas.style.width =
         `${width}px`;
@@ -251,14 +410,28 @@
         0
       );
 
-      if (shapes.length === 0) {
+      if (
+        shapes.length === 0
+      ) {
         createShapes();
       }
     }
 
-    function handlePointerMove(event) {
-      pointerX = event.clientX;
-      pointerY = event.clientY;
+    /*
+     * ==========================================================
+     * KURSOR
+     * ==========================================================
+     */
+
+    function handlePointerMove(
+      event
+    ) {
+      pointerX =
+        event.clientX;
+
+      pointerY =
+        event.clientY;
+
       pointerActive = true;
     }
 
@@ -266,7 +439,9 @@
       pointerActive = false;
     }
 
-    function updatePointerPhysics(delta) {
+    function updatePointerPhysics(
+      delta
+    ) {
       const rawVelocityX =
         pointerX -
         previousPointerX;
@@ -293,10 +468,11 @@
       previousPointerY =
         pointerY;
 
-      const rawSpeed = Math.hypot(
-        pointerVelocityX,
-        pointerVelocityY
-      );
+      const rawSpeed =
+        Math.hypot(
+          pointerVelocityX,
+          pointerVelocityY
+        );
 
       const normalizedSpeed =
         Math.min(
@@ -311,9 +487,14 @@
         ) * 0.12;
 
       if (!pointerActive) {
-        pointerVelocityX *= 0.92;
-        pointerVelocityY *= 0.92;
-        pointerSpeed *= 0.94;
+        pointerVelocityX *=
+          0.92;
+
+        pointerVelocityY *=
+          0.92;
+
+        pointerSpeed *=
+          0.94;
       }
 
       const centerX =
@@ -364,6 +545,12 @@
         ) * easing;
     }
 
+    /*
+     * ==========================================================
+     * AKTUALIZACJA ANIMACJI
+     * ==========================================================
+     */
+
     function updateTrail() {
       trail.unshift({
         x: currentX,
@@ -379,15 +566,21 @@
       }
     }
 
-    function updateShapes(time) {
+    function updateShapes(
+      time
+    ) {
       const normalizedX =
         pointerActive
-          ? pointerX / width - 0.5
+          ? pointerX /
+              width -
+            0.5
           : 0;
 
       const normalizedY =
         pointerActive
-          ? pointerY / height - 0.5
+          ? pointerY /
+              height -
+            0.5
           : 0;
 
       const speedExpansion =
@@ -409,7 +602,8 @@
 
           const wave =
             Math.sin(
-              time * 0.0012 +
+              time *
+                0.0012 +
                 shape.phase +
                 index
             ) * 0.12;
@@ -421,11 +615,13 @@
 
           const ellipseX =
             1 +
-            normalizedX * 0.35;
+            normalizedX *
+              0.35;
 
           const ellipseY =
             0.72 +
-            normalizedY * 0.22;
+            normalizedY *
+              0.22;
 
           shape.x =
             currentX +
@@ -449,15 +645,19 @@
             shape.size *
             (
               0.78 +
-              shape.depth * 0.45
+              shape.depth *
+                0.45
             ) *
             (
               1 +
               Math.sin(
-                time * 0.0017 +
+                time *
+                  0.0017 +
                   shape.phase
-              ) * 0.1 +
-              pointerSpeed * 0.16
+              ) *
+                0.1 +
+              pointerSpeed *
+                0.16
             );
 
           shape.rotation =
@@ -469,19 +669,27 @@
               pointerVelocityY,
               pointerVelocityX ||
                 0.001
-            ) * 0.18;
+            ) *
+              0.18;
         }
       );
     }
 
+    /*
+     * ==========================================================
+     * RYSOWANIE POŚWIATY
+     * ==========================================================
+     */
+
     function drawAmbientGlow() {
-      const radius = Math.min(
-        CONFIG.glowSize,
-        Math.max(
-          width,
-          height
-        ) * 0.82
-      );
+      const radius =
+        Math.min(
+          CONFIG.glowSize,
+          Math.max(
+            width,
+            height
+          ) * 0.75
+        );
 
       const gradient =
         context.createRadialGradient(
@@ -495,22 +703,22 @@
 
       gradient.addColorStop(
         0,
-        "rgba(234, 220, 255, 0.22)"
+        "rgba(125, 78, 255, 0.13)"
       );
 
       gradient.addColorStop(
-        0.18,
-        "rgba(154, 111, 255, 0.15)"
+        0.24,
+        "rgba(50, 128, 255, 0.08)"
       );
 
       gradient.addColorStop(
-        0.48,
-        "rgba(70, 127, 255, 0.07)"
+        0.58,
+        "rgba(226, 64, 180, 0.035)"
       );
 
       gradient.addColorStop(
         1,
-        "rgba(0, 0, 0, 0)"
+        "rgba(255, 255, 255, 0)"
       );
 
       context.fillStyle =
@@ -523,6 +731,12 @@
         height
       );
     }
+
+    /*
+     * ==========================================================
+     * ŚLAD
+     * ==========================================================
+     */
 
     function drawTrail() {
       for (
@@ -543,13 +757,13 @@
             );
 
         const radius =
-          26 +
-          point.speed * 50 +
-          progress * 18;
+          20 +
+          point.speed * 42 +
+          progress * 16;
 
         const alpha =
           progress *
-          0.07 *
+          0.035 *
           CONFIG.intensity;
 
         const gradient =
@@ -564,17 +778,12 @@
 
         gradient.addColorStop(
           0,
-          `rgba(
-            220,
-            198,
-            255,
-            ${alpha}
-          )`
+          `rgba(127, 73, 255, ${alpha})`
         );
 
         gradient.addColorStop(
           1,
-          "rgba(120, 80, 255, 0)"
+          "rgba(127, 73, 255, 0)"
         );
 
         context.fillStyle =
@@ -594,19 +803,29 @@
       }
     }
 
+    /*
+     * ==========================================================
+     * POŁĄCZENIA
+     * ==========================================================
+     */
+
     function drawConnections() {
       context.save();
-      context.lineWidth = 0.8;
+
+      context.lineWidth =
+        0.8;
 
       for (
         let first = 0;
-        first < shapes.length;
+        first <
+          shapes.length;
         first += 1
       ) {
         for (
           let second =
             first + 1;
-          second < shapes.length;
+          second <
+            shapes.length;
           second += 1
         ) {
           const shapeA =
@@ -627,7 +846,8 @@
             CONFIG.connectionDistance *
             (
               1 +
-              pointerSpeed * 0.22
+              pointerSpeed *
+                0.22
             );
 
           if (
@@ -643,7 +863,7 @@
               distance /
                 maxDistance
             ) *
-            0.12 *
+            0.17 *
             CONFIG.intensity;
 
           const gradient =
@@ -692,6 +912,12 @@
       context.restore();
     }
 
+    /*
+     * ==========================================================
+     * ORGANICZNA ŚCIEŻKA
+     * ==========================================================
+     */
+
     function createOrganicPath(
       shape,
       time,
@@ -706,7 +932,8 @@
 
       const stretch =
         1 +
-        pointerSpeed * 0.32;
+        pointerSpeed *
+          0.32;
 
       const velocityAngle =
         Math.atan2(
@@ -759,9 +986,11 @@
             ? 1
             : 1 +
               Math.sin(
-                time * 0.002 +
+                time *
+                  0.002 +
                   shape.phase +
-                  index * 1.73
+                  index *
+                    1.73
               ) *
                 shape.wobble;
 
@@ -788,7 +1017,9 @@
             point,
             index
           ) {
-            if (index === 0) {
+            if (
+              index === 0
+            ) {
               context.moveTo(
                 point.x,
                 point.y
@@ -807,7 +1038,8 @@
 
         const last =
           points[
-            points.length - 1
+            points.length -
+              1
           ];
 
         context.moveTo(
@@ -853,6 +1085,12 @@
       context.closePath();
     }
 
+    /*
+     * ==========================================================
+     * BĄBEL
+     * ==========================================================
+     */
+
     function drawBubble(
       shape,
       time
@@ -889,23 +1127,23 @@
 
       gradient.addColorStop(
         0,
-        "rgba(255, 255, 255, 0.28)"
+        "rgba(255, 255, 255, 0.75)"
       );
 
       gradient.addColorStop(
-        0.18,
+        0.12,
         rgba(
           shape.color,
-          0.24 *
+          0.3 *
             CONFIG.intensity
         )
       );
 
       gradient.addColorStop(
-        0.72,
+        0.62,
         rgba(
           shape.color,
-          0.08 *
+          0.1 *
             CONFIG.intensity
         )
       );
@@ -924,14 +1162,14 @@
       context.shadowColor =
         rgba(
           shape.color,
-          0.28
+          0.25
         );
 
       context.shadowBlur =
         Math.min(
           shape.renderedSize *
-            0.45,
-          36
+            0.35,
+          30
         );
 
       context.fill();
@@ -941,10 +1179,12 @@
       context.strokeStyle =
         rgba(
           shape.color,
-          0.2
+          0.42
         );
 
-      context.lineWidth = 1;
+      context.lineWidth =
+        1.2;
+
       context.stroke();
 
       context.beginPath();
@@ -964,11 +1204,18 @@
       );
 
       context.fillStyle =
-        "rgba(255, 255, 255, 0.42)";
+        "rgba(255, 255, 255, 0.85)";
 
       context.fill();
+
       context.restore();
     }
+
+    /*
+     * ==========================================================
+     * WIELOKĄT
+     * ==========================================================
+     */
 
     function drawPolygon(
       shape,
@@ -1003,20 +1250,20 @@
         0,
         rgba(
           shape.color,
-          0.27
+          0.32
         )
       );
 
       gradient.addColorStop(
         0.5,
-        "rgba(255, 255, 255, 0.08)"
+        "rgba(255,255,255,0.12)"
       );
 
       gradient.addColorStop(
         1,
         rgba(
           shape.color,
-          0.04
+          0.06
         )
       );
 
@@ -1028,15 +1275,26 @@
       context.strokeStyle =
         rgba(
           shape.color,
-          0.34
+          0.55
         );
 
-      context.lineWidth = 1.2;
+      context.lineWidth =
+        1.3;
+
       context.stroke();
+
       context.restore();
     }
 
-    function drawRing(shape) {
+    /*
+     * ==========================================================
+     * PIERŚCIEŃ
+     * ==========================================================
+     */
+
+    function drawRing(
+      shape
+    ) {
       context.save();
 
       context.translate(
@@ -1050,9 +1308,11 @@
 
       context.scale(
         1 +
-          pointerSpeed * 0.18,
+          pointerSpeed *
+            0.18,
         0.72 +
-          shape.depth * 0.16
+          shape.depth *
+            0.16
       );
 
       context.beginPath();
@@ -1068,12 +1328,12 @@
       context.strokeStyle =
         rgba(
           shape.color,
-          0.28
+          0.56
         );
 
       context.lineWidth =
         Math.max(
-          1,
+          1.2,
           shape.renderedSize *
             0.045
         );
@@ -1081,10 +1341,12 @@
       context.shadowColor =
         rgba(
           shape.color,
-          0.25
+          0.28
         );
 
-      context.shadowBlur = 18;
+      context.shadowBlur =
+        14;
+
       context.stroke();
 
       context.beginPath();
@@ -1099,16 +1361,22 @@
       );
 
       context.strokeStyle =
-        "rgba(255, 255, 255, 0.08)";
+        rgba(
+          shape.color,
+          0.2
+        );
 
       context.lineWidth = 1;
       context.shadowBlur = 0;
+
       context.stroke();
 
       context.restore();
     }
 
-    function drawShapes(time) {
+    function drawShapes(
+      time
+    ) {
       shapes
         .slice()
         .sort(
@@ -1129,25 +1397,41 @@
                 shape,
                 time
               );
-            } else if (
+
+              return;
+            }
+
+            if (
               shape.type ===
               "ring"
             ) {
-              drawRing(shape);
-            } else {
-              drawBubble(
-                shape,
-                time
+              drawRing(
+                shape
               );
+
+              return;
             }
+
+            drawBubble(
+              shape,
+              time
+            );
           }
         );
     }
 
-    function drawCursorCore(time) {
+    /*
+     * ==========================================================
+     * CENTRUM KURSORA
+     * ==========================================================
+     */
+
+    function drawCursorCore(
+      time
+    ) {
       const baseRadius =
-        52 +
-        pointerSpeed * 42;
+        45 +
+        pointerSpeed * 36;
 
       const glow =
         context.createRadialGradient(
@@ -1156,37 +1440,33 @@
           0,
           currentX,
           currentY,
-          baseRadius * 2.2
+          baseRadius * 2.1
         );
 
       glow.addColorStop(
         0,
-        "rgba(255, 255, 255, 0.32)"
+        "rgba(123, 73, 255, 0.24)"
       );
 
       glow.addColorStop(
-        0.18,
-        "rgba(206, 176, 255, 0.22)"
-      );
-
-      glow.addColorStop(
-        0.55,
-        "rgba(112, 92, 255, 0.08)"
+        0.2,
+        "rgba(54, 145, 255, 0.13)"
       );
 
       glow.addColorStop(
         1,
-        "rgba(0, 0, 0, 0)"
+        "rgba(255,255,255,0)"
       );
 
-      context.fillStyle = glow;
+      context.fillStyle =
+        glow;
 
       context.beginPath();
 
       context.arc(
         currentX,
         currentY,
-        baseRadius * 2.2,
+        baseRadius * 2.1,
         0,
         Math.PI * 2
       );
@@ -1218,8 +1498,7 @@
       ) {
         const angle =
           (
-            index /
-            sides
+            index / sides
           ) *
           Math.PI *
           2;
@@ -1227,11 +1506,14 @@
         const deformation =
           1 +
           Math.sin(
-            time * 0.002 +
-              index * 1.4
+            time *
+              0.002 +
+              index *
+                1.4
           ) *
             0.08 +
-          pointerSpeed * 0.08;
+          pointerSpeed *
+            0.08;
 
         const x =
           Math.cos(angle) *
@@ -1243,7 +1525,9 @@
           radius *
           deformation;
 
-        if (index === 0) {
+        if (
+          index === 0
+        ) {
           context.moveTo(
             x,
             y
@@ -1259,52 +1543,20 @@
       context.closePath();
 
       context.strokeStyle =
-        "rgba(235, 222, 255, 0.2)";
+        "rgba(104, 57, 225, 0.38)";
 
       context.lineWidth = 1;
+
       context.stroke();
+
       context.restore();
     }
 
     /*
-     * ============================================================
-     * LOGIKA PANELU DEVELOPERSKIEGO
-     * ============================================================
+     * ==========================================================
+     * PANEL DEVELOPERSKI
+     * ==========================================================
      */
-
-    function findDevButtons() {
-      return document.querySelectorAll(
-        `[data-effect-toggle="${EFFECT_ID}"]`
-      );
-    }
-
-    function updateDevButtons() {
-      const buttons =
-        findDevButtons();
-
-      buttons.forEach(
-        function (button) {
-          button.setAttribute(
-            "aria-pressed",
-            String(
-              effectEnabled
-            )
-          );
-
-          const status =
-            button.querySelector(
-              "[data-effect-status]"
-            );
-
-          if (status) {
-            status.textContent =
-              effectEnabled
-                ? "ON"
-                : "OFF";
-          }
-        }
-      );
-    }
 
     function readSavedState() {
       if (!DEV_MODE) {
@@ -1312,14 +1564,15 @@
       }
 
       try {
-        const savedValue =
+        const storedValue =
           localStorage.getItem(
             STORAGE_KEY
           );
 
-        return savedValue === null
+        return storedValue === null
           ? true
-          : savedValue === "true";
+          : storedValue ===
+              "true";
       } catch (error) {
         return true;
       }
@@ -1338,7 +1591,32 @@
           )
         );
       } catch (error) {
-        // localStorage może być zablokowany.
+        console.warn(
+          "[Bubble FX] Nie udało się zapisać ustawienia."
+        );
+      }
+    }
+
+    function updateButton(
+      button
+    ) {
+      button.disabled = false;
+
+      button.setAttribute(
+        "aria-pressed",
+        String(effectEnabled)
+      );
+
+      const status =
+        button.querySelector(
+          "[data-effect-status]"
+        );
+
+      if (status) {
+        status.textContent =
+          effectEnabled
+            ? "ON"
+            : "OFF";
       }
     }
 
@@ -1351,10 +1629,10 @@
           ? Boolean(enabled)
           : true;
 
-      canvas.style.visibility =
+      canvas.style.display =
         effectEnabled
-          ? "visible"
-          : "hidden";
+          ? "block"
+          : "none";
 
       canvas.style.opacity =
         effectEnabled
@@ -1377,45 +1655,64 @@
           performance.now();
       }
 
-      updateDevButtons();
+      document
+        .querySelectorAll(
+          `[data-effect-toggle="${EFFECT_ID}"]`
+        )
+        .forEach(
+          updateButton
+        );
 
       if (persist) {
         saveState();
       }
+
+      console.info(
+        `[Bubble FX] ${
+          effectEnabled
+            ? "ON"
+            : "OFF"
+        }`
+      );
     }
 
-    function initializeDevControls() {
-      setEffectEnabled(
-        readSavedState(),
-        false
-      );
+    function bindButton(
+      button
+    ) {
+      if (
+        button.dataset
+          .bubbleFxBound ===
+        VERSION
+      ) {
+        updateButton(
+          button
+        );
 
-      if (!DEV_MODE) {
         return;
       }
 
-      document.addEventListener(
+      button.dataset
+        .bubbleFxBound =
+        VERSION;
+
+      button.disabled = false;
+
+      button.style.pointerEvents =
+        "auto";
+
+      button.addEventListener(
+        "pointerdown",
+        function (event) {
+          event.stopPropagation();
+        }
+      );
+
+      button.addEventListener(
         "click",
         function (event) {
-          if (
-            !(
-              event.target instanceof
-              Element
-            )
-          ) {
-            return;
-          }
-
-          const button =
-            event.target.closest(
-              `[data-effect-toggle="${EFFECT_ID}"]`
-            );
-
-          if (!button) {
-            return;
-          }
-
           event.preventDefault();
+          event.stopPropagation();
+          event.stopImmediatePropagation();
 
           setEffectEnabled(
             !effectEnabled,
@@ -1423,50 +1720,123 @@
           );
         }
       );
+
+      updateButton(
+        button
+      );
+    }
+
+    function rescanControls() {
+      const panels =
+        Array.from(
+          document.querySelectorAll(
+            "[data-fx-dev-panel]"
+          )
+        );
+
+      if (!DEV_MODE) {
+        panels.forEach(
+          function (panel) {
+            panel.remove();
+          }
+        );
+
+        return;
+      }
+
+      if (
+        panels.length === 0
+      ) {
+        return;
+      }
+
+      const panel =
+        panels[
+          panels.length - 1
+        ];
+
+      /*
+       * Usuwamy ewentualne kopie panelu,
+       * które ArtSaaS utworzył podczas nawigacji.
+       */
+      panels.forEach(
+        function (
+          currentPanel
+        ) {
+          if (
+            currentPanel !==
+            panel
+          ) {
+            currentPanel.remove();
+          }
+        }
+      );
+
+      /*
+       * Kluczowa poprawka:
+       * panel trafia bezpośrednio do BODY,
+       * dzięki czemu rodzice ArtSaaS nie blokują kliknięć.
+       */
+      if (
+        panel.parentElement !==
+        document.body
+      ) {
+        document.body.appendChild(
+          panel
+        );
+      }
+
+      Object.assign(
+        panel.style,
+        {
+          pointerEvents: "auto",
+          zIndex: "2147483647",
+          visibility: "visible",
+          display: "flex"
+        }
+      );
+
+      const button =
+        panel.querySelector(
+          `[data-effect-toggle="${EFFECT_ID}"]`
+        );
+
+      if (button) {
+        bindButton(
+          button
+        );
+      }
+    }
+
+    function scheduleControlScan() {
+      if (
+        controlScanScheduled
+      ) {
+        return;
+      }
+
+      controlScanScheduled =
+        true;
+
+      requestAnimationFrame(
+        function () {
+          controlScanScheduled =
+            false;
+
+          rescanControls();
+        }
+      );
     }
 
     /*
-     * Opcjonalne ręczne sterowanie z konsoli:
-     *
-     * ArtSaaSFX.bubbles.enable()
-     * ArtSaaSFX.bubbles.disable()
-     * ArtSaaSFX.bubbles.toggle()
-     * ArtSaaSFX.bubbles.isEnabled()
+     * ==========================================================
+     * RENDEROWANIE
+     * ==========================================================
      */
 
-    window.ArtSaaSFX =
-      window.ArtSaaSFX || {};
-
-    window.ArtSaaSFX[
-      EFFECT_ID
-    ] = {
-      enable: function () {
-        setEffectEnabled(
-          true,
-          DEV_MODE
-        );
-      },
-
-      disable: function () {
-        setEffectEnabled(
-          false,
-          DEV_MODE
-        );
-      },
-
-      toggle: function () {
-        setEffectEnabled(
-          !effectEnabled,
-          DEV_MODE
-        );
-      },
-
-      isEnabled: function () {
-        return effectEnabled;
-      }
-    };
-
-    function render(timestamp) {
+    function render(
+      timestamp
+    ) {
       requestAnimationFrame(
         render
       );
@@ -1519,7 +1889,9 @@
       );
 
       updateTrail();
-      updateShapes(timestamp);
+      updateShapes(
+        timestamp
+      );
 
       context.clearRect(
         0,
@@ -1529,17 +1901,27 @@
       );
 
       context.globalCompositeOperation =
-        "screen";
+        "source-over";
 
       drawAmbientGlow();
       drawTrail();
       drawConnections();
-      drawShapes(timestamp);
-      drawCursorCore(timestamp);
+      drawShapes(
+        timestamp
+      );
+      drawCursorCore(
+        timestamp
+      );
 
       context.globalCompositeOperation =
         "source-over";
     }
+
+    /*
+     * ==========================================================
+     * EVENTY
+     * ==========================================================
+     */
 
     window.addEventListener(
       "pointermove",
@@ -1565,10 +1947,11 @@
       }
     );
 
-    document.documentElement.addEventListener(
-      "mouseleave",
-      handlePointerEnd
-    );
+    document.documentElement
+      .addEventListener(
+        "mouseleave",
+        handlePointerEnd
+      );
 
     window.addEventListener(
       "blur",
@@ -1592,9 +1975,9 @@
     );
 
     /*
-     * ArtSaaS może dynamicznie przebudowywać stronę.
-     * Observer pilnuje canvasa i aktualizuje przycisk,
-     * gdy panel zostanie dodany później.
+     * ==========================================================
+     * OBSERWATOR ARTSAAS
+     * ==========================================================
      */
 
     const observer =
@@ -1610,9 +1993,7 @@
             );
           }
 
-          if (DEV_MODE) {
-            updateDevButtons();
-          }
+          scheduleControlScan();
         }
       );
 
@@ -1624,11 +2005,90 @@
       }
     );
 
+    /*
+     * ==========================================================
+     * PUBLICZNE STEROWANIE
+     * ==========================================================
+     */
+
+    window.ArtSaaSFX =
+      window.ArtSaaSFX ||
+      {};
+
+    window.ArtSaaSFX[
+      EFFECT_ID
+    ] = {
+      enable:
+        function () {
+          setEffectEnabled(
+            true,
+            DEV_MODE
+          );
+        },
+
+      disable:
+        function () {
+          setEffectEnabled(
+            false,
+            DEV_MODE
+          );
+        },
+
+      toggle:
+        function () {
+          setEffectEnabled(
+            !effectEnabled,
+            DEV_MODE
+          );
+        },
+
+      isEnabled:
+        function () {
+          return effectEnabled;
+        },
+
+      rescanControls
+    };
+
+    window.__ARTSAAS_BUBBLE_FX__ =
+      window.ArtSaaSFX[
+        EFFECT_ID
+      ];
+
+    /*
+     * ==========================================================
+     * START
+     * ==========================================================
+     */
+
     resizeCanvas();
-    initializeDevControls();
+
+    effectEnabled =
+      readSavedState();
+
+    setEffectEnabled(
+      effectEnabled,
+      false
+    );
+
+    rescanControls();
 
     requestAnimationFrame(
       render
+    );
+
+    console.info(
+      `[Bubble FX] Załadowano wersję ${VERSION}`,
+      {
+        devMode:
+          DEV_MODE,
+
+        enabled:
+          effectEnabled,
+
+        blendMode:
+          CONFIG.blendMode
+      }
     );
   }
 
