@@ -4,28 +4,50 @@
   const CONFIG = {
     bubbleCount: 10,
 
-    // Rozmiar bąbelków jest dodatkowo dopasowywany do ekranu.
+    // Rozmiary bąbelków.
     baseRadius: 76,
     minRadius: 48,
     maxRadius: 104,
     sizeVariation: 0.24,
 
-    // Wygląd na jasnym i ciemnym tle.
+    // Wygląd.
     bubbleOpacity: 0.96,
     outerGlowOpacity: 0.22,
     blendMode: "normal",
 
-    // Spokojne, samoczynne pływanie.
+    // Spokojne pływanie.
     driftStrength: 0.0045,
     driftSpeed: 0.00026,
-    damping: 0.993,
-    maxSpeed: 1.85,
+    damping: 0.992,
+    maxSpeed: 2.9,
 
-    // Kursor zachowuje się jak delikatny palec lub podmuch.
-    cursorPressRange: 28,
-    cursorForce: 0.032,
-    cursorWind: 0.0035,
-    maxPressDeformation: 0.3,
+    // Reakcja na kursor.
+    cursorPressRange: 42,
+
+    // Siła lekkiego dotknięcia.
+    cursorSoftForce: 0.014,
+
+    // Siła głębokiego wciśnięcia kursora.
+    cursorDeepForce: 0.13,
+
+    // Podmuch przy lekkim ruchu kursora.
+    cursorWind: 0.005,
+
+    // Podmuch przy wejściu głęboko w bąbelek.
+    cursorDeepWind: 0.016,
+
+    // Maksymalna deformacja.
+    maxPressDeformation: 0.46,
+
+    // Szybkość pojawiania się wgniecenia.
+    pressResponse: 0.28,
+
+    // Szybkość powrotu bąbelka do kształtu.
+    pressRelease: 0.12,
+
+    // Płynność orientacji bąbelka.
+    rotationResponse: 0.09,
+    minimumRotationSpeed: 0.025,
 
     // Zderzenia bąbelków.
     collisionBounce: 0.58,
@@ -36,12 +58,11 @@
     zIndex: 2147483646
   };
 
-  // Ochrona przed wielokrotnym uruchomieniem skryptu.
-  if (window.__balloonWaterBubblesInitialized) {
+  if (window.__balloonWaterBubblesV2Initialized) {
     return;
   }
 
-  window.__balloonWaterBubblesInitialized = true;
+  window.__balloonWaterBubblesV2Initialized = true;
 
   function initializeBalloonWaterBubbles() {
     const oldCanvas = document.getElementById(
@@ -78,6 +99,7 @@
       console.error(
         "[Balloon Bubbles] Przeglądarka nie obsługuje canvas."
       );
+
       return;
     }
 
@@ -105,6 +127,7 @@
     let pointerActive = false;
 
     let lastFrameTime = 0;
+
     const startTime = performance.now();
 
     let animationPaused = false;
@@ -122,13 +145,6 @@
       return min + Math.random() * (max - min);
     }
 
-    function angleDifference(first, second) {
-      return Math.atan2(
-        Math.sin(first - second),
-        Math.cos(first - second)
-      );
-    }
-
     function smoothstep(value) {
       const normalized = clamp(value, 0, 1);
 
@@ -139,12 +155,48 @@
       );
     }
 
-    function getResponsiveBaseRadius() {
-      const screenBasedRadius =
-        Math.min(width, height) * 0.115;
+    function angleDifference(first, second) {
+      return Math.atan2(
+        Math.sin(first - second),
+        Math.cos(first - second)
+      );
+    }
 
+    /*
+     * Dla rozciągniętej elipsy kierunek 0 i PI oznacza
+     * tę samą oś. Dzięki temu bąbelek nie przeskakuje
+     * nagle o 180 stopni.
+     */
+    function axisAngleDifference(target, current) {
+      const differences = [
+        angleDifference(
+          target,
+          current
+        ),
+
+        angleDifference(
+          target + Math.PI,
+          current
+        ),
+
+        angleDifference(
+          target - Math.PI,
+          current
+        )
+      ];
+
+      return differences.reduce(
+        function (best, candidate) {
+          return Math.abs(candidate) < Math.abs(best)
+            ? candidate
+            : best;
+        }
+      );
+    }
+
+    function getResponsiveBaseRadius() {
       return clamp(
-        screenBasedRadius,
+        Math.min(width, height) * 0.115,
         CONFIG.minRadius,
         CONFIG.baseRadius
       );
@@ -165,23 +217,33 @@
       );
     }
 
-    function isSpawnPositionFree(x, y, radius) {
-      return bubbles.every(function (bubble) {
-        const minimumDistance =
-          (radius + bubble.radius) * 1.08;
+    function isSpawnPositionFree(
+      x,
+      y,
+      radius
+    ) {
+      return bubbles.every(
+        function (bubble) {
+          const minimumDistance =
+            (
+              radius +
+              bubble.radius
+            ) * 1.08;
 
-        const distance = Math.hypot(
-          x - bubble.x,
-          y - bubble.y
-        );
+          const distance = Math.hypot(
+            x - bubble.x,
+            y - bubble.y
+          );
 
-        return distance >= minimumDistance;
-      });
+          return distance >= minimumDistance;
+        }
+      );
     }
 
     function findSpawnPosition(radius) {
       const padding =
-        CONFIG.edgePadding + radius;
+        CONFIG.edgePadding +
+        radius;
 
       const usableRight = Math.max(
         padding,
@@ -195,7 +257,7 @@
 
       for (
         let attempt = 0;
-        attempt < 120;
+        attempt < 140;
         attempt += 1
       ) {
         const x = random(
@@ -222,8 +284,6 @@
         }
       }
 
-      // Awaryjna pozycja, gdy ekran jest mały
-      // i trudno znaleźć wolne miejsce.
       return {
         x: random(
           padding,
@@ -267,7 +327,10 @@
           initialSpeed,
 
         radius,
-        mass: radius * radius,
+
+        mass:
+          radius *
+          radius,
 
         seed: random(
           0,
@@ -289,14 +352,22 @@
           Math.PI * 2
         ),
 
-        // Deformacja powodowana kursorem.
+        // Płynna oś rozciągnięcia.
+        rotation: angle,
+
+        // Nacisk kursora.
         pressAmount: 0,
         pressTarget: 0,
+
         pressNX: 1,
         pressNY: 0,
 
+        insideDepth: 0,
+        pointerSpeedInfluence: 0,
+
         // Deformacja podczas zderzenia.
         collisionAmount: 0,
+
         collisionNX: 1,
         collisionNY: 0,
 
@@ -316,324 +387,6 @@
           createBubble(index)
         );
       }
-    }
-
-    function resizeCanvas() {
-      previousWidth = width;
-      previousHeight = height;
-
-      width = window.innerWidth;
-      height = window.innerHeight;
-
-      pixelRatio = Math.min(
-        window.devicePixelRatio || 1,
-        2
-      );
-
-      canvas.width = Math.round(
-        width * pixelRatio
-      );
-
-      canvas.height = Math.round(
-        height * pixelRatio
-      );
-
-      canvas.style.width = `${width}px`;
-      canvas.style.height = `${height}px`;
-
-      context.setTransform(
-        pixelRatio,
-        0,
-        0,
-        pixelRatio,
-        0,
-        0
-      );
-
-      if (bubbles.length === 0) {
-        rebuildBubbles();
-        return;
-      }
-
-      const scaleX =
-        previousWidth > 0
-          ? width / previousWidth
-          : 1;
-
-      const scaleY =
-        previousHeight > 0
-          ? height / previousHeight
-          : 1;
-
-      bubbles.forEach(function (bubble) {
-        bubble.x *= scaleX;
-        bubble.y *= scaleY;
-
-        const radiusScale = clamp(
-          Math.min(scaleX, scaleY),
-          0.82,
-          1.18
-        );
-
-        bubble.radius = clamp(
-          bubble.radius * radiusScale,
-          CONFIG.minRadius,
-          CONFIG.maxRadius
-        );
-
-        bubble.mass =
-          bubble.radius *
-          bubble.radius;
-
-        keepBubbleInsideScreen(
-          bubble
-        );
-      });
-    }
-
-    function handlePointerMove(event) {
-      if (!pointerActive) {
-        previousPointerX =
-          event.clientX;
-
-        previousPointerY =
-          event.clientY;
-      }
-
-      pointerX = event.clientX;
-      pointerY = event.clientY;
-
-      pointerActive = true;
-    }
-
-    function handlePointerLeave() {
-      pointerActive = false;
-
-      pointerX = -10000;
-      pointerY = -10000;
-
-      pointerVelocityX = 0;
-      pointerVelocityY = 0;
-    }
-
-    function updatePointerVelocity() {
-      if (!pointerActive) {
-        pointerVelocityX *= 0.78;
-        pointerVelocityY *= 0.78;
-
-        return;
-      }
-
-      const rawVelocityX =
-        pointerX -
-        previousPointerX;
-
-      const rawVelocityY =
-        pointerY -
-        previousPointerY;
-
-      pointerVelocityX +=
-        (
-          rawVelocityX -
-          pointerVelocityX
-        ) * 0.2;
-
-      pointerVelocityY +=
-        (
-          rawVelocityY -
-          pointerVelocityY
-        ) * 0.2;
-
-      previousPointerX = pointerX;
-      previousPointerY = pointerY;
-    }
-
-    function applyNaturalDrift(
-      bubble,
-      time,
-      delta
-    ) {
-      if (prefersReducedMotion) {
-        return;
-      }
-
-      const slowTime =
-        time *
-        CONFIG.driftSpeed;
-
-      const driftX =
-        Math.sin(
-          slowTime * 0.91 +
-          bubble.driftOffsetX
-        ) +
-        Math.sin(
-          slowTime * 0.41 +
-          bubble.seed
-        ) * 0.52;
-
-      const driftY =
-        Math.cos(
-          slowTime * 0.73 +
-          bubble.driftOffsetY
-        ) +
-        Math.sin(
-          slowTime * 0.29 +
-          bubble.seed * 0.8
-        ) * 0.46;
-
-      bubble.velocityX +=
-        driftX *
-        CONFIG.driftStrength *
-        delta;
-
-      bubble.velocityY +=
-        driftY *
-        CONFIG.driftStrength *
-        delta;
-
-      // Bardzo delikatne unoszenie.
-      bubble.velocityY -=
-        0.0009 * delta;
-    }
-
-    function applyCursorPressure(
-      bubble,
-      delta
-    ) {
-      bubble.pressTarget = 0;
-
-      if (!pointerActive) {
-        bubble.pressAmount +=
-          (
-            bubble.pressTarget -
-            bubble.pressAmount
-          ) *
-          0.12 *
-          delta;
-
-        return;
-      }
-
-      const dx =
-        pointerX -
-        bubble.x;
-
-      const dy =
-        pointerY -
-        bubble.y;
-
-      let distance = Math.hypot(
-        dx,
-        dy
-      );
-
-      let normalX =
-        bubble.pressNX;
-
-      let normalY =
-        bubble.pressNY;
-
-      if (distance > 0.001) {
-        normalX = dx / distance;
-        normalY = dy / distance;
-      } else {
-        distance = 0.001;
-      }
-
-      const contactDistance =
-        bubble.radius +
-        CONFIG.cursorPressRange;
-
-      if (
-        distance <
-        contactDistance
-      ) {
-        const penetration =
-          1 -
-          distance /
-            contactDistance;
-
-        const pressure =
-          smoothstep(
-            penetration
-          );
-
-        bubble.pressTarget =
-          pressure;
-
-        bubble.pressNX +=
-          (
-            normalX -
-            bubble.pressNX
-          ) *
-          0.26 *
-          delta;
-
-        bubble.pressNY +=
-          (
-            normalY -
-            bubble.pressNY
-          ) *
-          0.26 *
-          delta;
-
-        const pressLength = Math.max(
-          Math.hypot(
-            bubble.pressNX,
-            bubble.pressNY
-          ),
-          0.001
-        );
-
-        bubble.pressNX /=
-          pressLength;
-
-        bubble.pressNY /=
-          pressLength;
-
-        // Delikatne odsuwanie.
-        const pushStrength =
-          CONFIG.cursorForce *
-          pressure *
-          pressure;
-
-        bubble.velocityX -=
-          bubble.pressNX *
-          pushStrength *
-          delta;
-
-        bubble.velocityY -=
-          bubble.pressNY *
-          pushStrength *
-          delta;
-
-        // Ruch kursora dodaje tylko subtelny podmuch.
-        bubble.velocityX +=
-          pointerVelocityX *
-          CONFIG.cursorWind *
-          pressure *
-          delta;
-
-        bubble.velocityY +=
-          pointerVelocityY *
-          CONFIG.cursorWind *
-          pressure *
-          delta;
-      }
-
-      bubble.pressAmount +=
-        (
-          bubble.pressTarget -
-          bubble.pressAmount
-        ) *
-        0.18 *
-        delta;
-
-      bubble.pressAmount = clamp(
-        bubble.pressAmount,
-        0,
-        1
-      );
     }
 
     function keepBubbleInsideScreen(
@@ -697,6 +450,496 @@
       }
     }
 
+    function resizeCanvas() {
+      previousWidth = width;
+      previousHeight = height;
+
+      width = window.innerWidth;
+      height = window.innerHeight;
+
+      pixelRatio = Math.min(
+        window.devicePixelRatio || 1,
+        2
+      );
+
+      canvas.width = Math.round(
+        width * pixelRatio
+      );
+
+      canvas.height = Math.round(
+        height * pixelRatio
+      );
+
+      canvas.style.width =
+        `${width}px`;
+
+      canvas.style.height =
+        `${height}px`;
+
+      context.setTransform(
+        pixelRatio,
+        0,
+        0,
+        pixelRatio,
+        0,
+        0
+      );
+
+      if (bubbles.length === 0) {
+        rebuildBubbles();
+        return;
+      }
+
+      const scaleX =
+        previousWidth > 0
+          ? width / previousWidth
+          : 1;
+
+      const scaleY =
+        previousHeight > 0
+          ? height / previousHeight
+          : 1;
+
+      bubbles.forEach(
+        function (bubble) {
+          bubble.x *= scaleX;
+          bubble.y *= scaleY;
+
+          const radiusScale = clamp(
+            Math.min(
+              scaleX,
+              scaleY
+            ),
+            0.82,
+            1.18
+          );
+
+          bubble.radius = clamp(
+            bubble.radius *
+              radiusScale,
+            CONFIG.minRadius,
+            CONFIG.maxRadius
+          );
+
+          bubble.mass =
+            bubble.radius *
+            bubble.radius;
+
+          keepBubbleInsideScreen(
+            bubble
+          );
+        }
+      );
+    }
+
+    function handlePointerMove(event) {
+      if (!pointerActive) {
+        previousPointerX =
+          event.clientX;
+
+        previousPointerY =
+          event.clientY;
+      }
+
+      pointerX = event.clientX;
+      pointerY = event.clientY;
+
+      pointerActive = true;
+    }
+
+    function handlePointerLeave() {
+      pointerActive = false;
+
+      pointerX = -10000;
+      pointerY = -10000;
+
+      pointerVelocityX = 0;
+      pointerVelocityY = 0;
+    }
+
+    function updatePointerVelocity() {
+      if (!pointerActive) {
+        pointerVelocityX *= 0.78;
+        pointerVelocityY *= 0.78;
+
+        return;
+      }
+
+      const rawVelocityX =
+        pointerX -
+        previousPointerX;
+
+      const rawVelocityY =
+        pointerY -
+        previousPointerY;
+
+      pointerVelocityX +=
+        (
+          rawVelocityX -
+          pointerVelocityX
+        ) * 0.2;
+
+      pointerVelocityY +=
+        (
+          rawVelocityY -
+          pointerVelocityY
+        ) * 0.2;
+
+      previousPointerX =
+        pointerX;
+
+      previousPointerY =
+        pointerY;
+    }
+
+    function updateBubbleRotation(
+      bubble,
+      delta
+    ) {
+      const speed = Math.hypot(
+        bubble.velocityX,
+        bubble.velocityY
+      );
+
+      if (
+        speed <
+        CONFIG.minimumRotationSpeed
+      ) {
+        return;
+      }
+
+      const targetRotation =
+        Math.atan2(
+          bubble.velocityY,
+          bubble.velocityX
+        );
+
+      const difference =
+        axisAngleDifference(
+          targetRotation,
+          bubble.rotation
+        );
+
+      const response =
+        1 -
+        Math.pow(
+          1 -
+            CONFIG.rotationResponse,
+          delta
+        );
+
+      bubble.rotation +=
+        difference *
+        response;
+    }
+
+    function applyNaturalDrift(
+      bubble,
+      time,
+      delta
+    ) {
+      if (prefersReducedMotion) {
+        return;
+      }
+
+      const slowTime =
+        time *
+        CONFIG.driftSpeed;
+
+      const driftX =
+        Math.sin(
+          slowTime * 0.91 +
+          bubble.driftOffsetX
+        ) +
+        Math.sin(
+          slowTime * 0.41 +
+          bubble.seed
+        ) * 0.52;
+
+      const driftY =
+        Math.cos(
+          slowTime * 0.73 +
+          bubble.driftOffsetY
+        ) +
+        Math.sin(
+          slowTime * 0.29 +
+          bubble.seed * 0.8
+        ) * 0.46;
+
+      bubble.velocityX +=
+        driftX *
+        CONFIG.driftStrength *
+        delta;
+
+      bubble.velocityY +=
+        driftY *
+        CONFIG.driftStrength *
+        delta;
+
+      // Bardzo lekkie unoszenie.
+      bubble.velocityY -=
+        0.0009 *
+        delta;
+    }
+
+    function applyCursorPressure(
+      bubble,
+      delta
+    ) {
+      bubble.pressTarget = 0;
+      bubble.insideDepth = 0;
+      bubble.pointerSpeedInfluence = 0;
+
+      if (!pointerActive) {
+        const releaseResponse =
+          1 -
+          Math.pow(
+            1 -
+              CONFIG.pressRelease,
+            delta
+          );
+
+        bubble.pressAmount +=
+          (
+            bubble.pressTarget -
+            bubble.pressAmount
+          ) *
+          releaseResponse;
+
+        return;
+      }
+
+      const dx =
+        pointerX -
+        bubble.x;
+
+      const dy =
+        pointerY -
+        bubble.y;
+
+      let distance = Math.hypot(
+        dx,
+        dy
+      );
+
+      let normalX =
+        bubble.pressNX;
+
+      let normalY =
+        bubble.pressNY;
+
+      if (distance > 0.001) {
+        normalX =
+          dx / distance;
+
+        normalY =
+          dy / distance;
+      } else {
+        distance = 0.001;
+      }
+
+      const outerDistance =
+        bubble.radius +
+        CONFIG.cursorPressRange;
+
+      if (
+        distance <
+        outerDistance
+      ) {
+        /*
+         * approach:
+         * 0 = poza strefą kontaktu,
+         * 1 = kursor dotyka powierzchni.
+         */
+        const approach = clamp(
+          (
+            outerDistance -
+            distance
+          ) /
+            CONFIG.cursorPressRange,
+          0,
+          1
+        );
+
+        /*
+         * insideDepth:
+         * 0 = powierzchnia,
+         * 1 = sam środek bąbelka.
+         */
+        const insideDepth = clamp(
+          (
+            bubble.radius -
+            distance
+          ) /
+            bubble.radius,
+          0,
+          1
+        );
+
+        const softPressure =
+          smoothstep(
+            approach
+          ) * 0.22;
+
+        const deepPressure =
+          Math.pow(
+            insideDepth,
+            0.72
+          );
+
+        bubble.pressTarget = clamp(
+          softPressure +
+          deepPressure,
+          0,
+          1
+        );
+
+        bubble.insideDepth =
+          insideDepth;
+
+        const pointerSpeed =
+          Math.hypot(
+            pointerVelocityX,
+            pointerVelocityY
+          );
+
+        bubble.pointerSpeedInfluence =
+          clamp(
+            pointerSpeed / 34,
+            0,
+            1
+          );
+
+        const normalResponse =
+          1 -
+          Math.pow(
+            0.68,
+            delta
+          );
+
+        bubble.pressNX +=
+          (
+            normalX -
+            bubble.pressNX
+          ) *
+          normalResponse;
+
+        bubble.pressNY +=
+          (
+            normalY -
+            bubble.pressNY
+          ) *
+          normalResponse;
+
+        const pressLength =
+          Math.max(
+            Math.hypot(
+              bubble.pressNX,
+              bubble.pressNY
+            ),
+            0.001
+          );
+
+        bubble.pressNX /=
+          pressLength;
+
+        bubble.pressNY /=
+          pressLength;
+
+        /*
+         * Lekki kontakt powoduje tylko
+         * delikatne odsunięcie.
+         */
+        const softPush =
+          CONFIG.cursorSoftForce *
+          smoothstep(
+            approach
+          ) *
+          (
+            1 -
+            insideDepth * 0.35
+          );
+
+        /*
+         * Głębokie wejście w bąbelek
+         * działa znacznie mocniej.
+         */
+        const deepPush =
+          CONFIG.cursorDeepForce *
+          Math.pow(
+            insideDepth,
+            1.75
+          );
+
+        const totalPush =
+          softPush +
+          deepPush;
+
+        bubble.velocityX -=
+          bubble.pressNX *
+          totalPush *
+          delta;
+
+        bubble.velocityY -=
+          bubble.pressNY *
+          totalPush *
+          delta;
+
+        /*
+         * Szybki ruch kursora działa
+         * jak podmuch powietrza.
+         */
+        const windStrength =
+          CONFIG.cursorWind *
+            approach +
+          CONFIG.cursorDeepWind *
+            Math.pow(
+              insideDepth,
+              1.5
+            );
+
+        bubble.velocityX +=
+          pointerVelocityX *
+          windStrength *
+          delta;
+
+        bubble.velocityY +=
+          pointerVelocityY *
+          windStrength *
+          delta;
+      }
+
+      const isPressing =
+        bubble.pressTarget >
+        bubble.pressAmount;
+
+      const configuredResponse =
+        isPressing
+          ? CONFIG.pressResponse
+          : CONFIG.pressRelease;
+
+      const response =
+        1 -
+        Math.pow(
+          1 -
+            configuredResponse,
+          delta
+        );
+
+      bubble.pressAmount +=
+        (
+          bubble.pressTarget -
+          bubble.pressAmount
+        ) *
+        response;
+
+      bubble.pressAmount = clamp(
+        bubble.pressAmount,
+        0,
+        1
+      );
+    }
+
     function updateBubblePhysics(
       bubble,
       time,
@@ -713,18 +956,23 @@
         delta
       );
 
-      const damping = Math.pow(
-        CONFIG.damping,
-        delta
-      );
+      const damping =
+        Math.pow(
+          CONFIG.damping,
+          delta
+        );
 
-      bubble.velocityX *= damping;
-      bubble.velocityY *= damping;
+      bubble.velocityX *=
+        damping;
 
-      const speed = Math.hypot(
-        bubble.velocityX,
-        bubble.velocityY
-      );
+      bubble.velocityY *=
+        damping;
+
+      const speed =
+        Math.hypot(
+          bubble.velocityX,
+          bubble.velocityY
+        );
 
       if (
         speed >
@@ -734,8 +982,11 @@
           CONFIG.maxSpeed /
           speed;
 
-        bubble.velocityX *= scale;
-        bubble.velocityY *= scale;
+        bubble.velocityX *=
+          scale;
+
+        bubble.velocityY *=
+          scale;
       }
 
       bubble.x +=
@@ -751,6 +1002,11 @@
           0.86,
           delta
         );
+
+      updateBubbleRotation(
+        bubble,
+        delta
+      );
 
       keepBubbleInsideScreen(
         bubble
@@ -782,10 +1038,11 @@
             bubbleB.y -
             bubbleA.y;
 
-          let distance = Math.hypot(
-            dx,
-            dy
-          );
+          let distance =
+            Math.hypot(
+              dx,
+              dy
+            );
 
           const minimumDistance =
             bubbleA.radius +
@@ -829,10 +1086,12 @@
             distance;
 
           const inverseMassA =
-            1 / bubbleA.mass;
+            1 /
+            bubbleA.mass;
 
           const inverseMassB =
-            1 / bubbleB.mass;
+            1 /
+            bubbleB.mass;
 
           const inverseMassSum =
             inverseMassA +
@@ -924,10 +1183,10 @@
                   bubbleB.radius
                 ) *
                 2.8 +
-                Math.abs(
-                  velocityAlongNormal
-                ) *
-                  0.15,
+              Math.abs(
+                velocityAlongNormal
+              ) *
+                0.15,
               0,
               1
             );
@@ -973,40 +1232,59 @@
 
     function createBubblePath(
       bubble,
-      time,
-      movementAngle
+      time
     ) {
-      const points = 64;
+      const points = 72;
 
-      const speed = Math.hypot(
-        bubble.velocityX,
-        bubble.velocityY
-      );
+      const speed =
+        Math.hypot(
+          bubble.velocityX,
+          bubble.velocityY
+        );
 
-      const speedRatio = clamp(
-        speed /
-          CONFIG.maxSpeed,
-        0,
-        1
-      );
+      const speedRatio =
+        clamp(
+          speed /
+            CONFIG.maxSpeed,
+          0,
+          1
+        );
 
       const movementStretch =
         1 +
-        speedRatio * 0.06;
+        speedRatio * 0.065;
 
       const pressAngle =
         Math.atan2(
           bubble.pressNY,
           bubble.pressNX
         ) -
-        movementAngle;
+        bubble.rotation;
 
       const collisionAngle =
         Math.atan2(
           bubble.collisionNY,
           bubble.collisionNX
         ) -
-        movementAngle;
+        bubble.rotation;
+
+      const deformationStrength =
+        bubble.pressAmount *
+        CONFIG.maxPressDeformation;
+
+      /*
+       * Głębokie i szybkie wejście zwiększa
+       * sprężyste rozpychanie bąbelka.
+       */
+      const dynamicCompression =
+        deformationStrength *
+        (
+          1 +
+          bubble.insideDepth *
+            0.28 +
+          bubble.pointerSpeedInfluence *
+            0.12
+        );
 
       context.beginPath();
 
@@ -1038,7 +1316,9 @@
           ) *
             0.007;
 
-        // Wgniecenie po stronie kursora.
+        /*
+         * Wgniecenie po stronie kursora.
+         */
         const pressDifference =
           angleDifference(
             angle,
@@ -1049,33 +1329,88 @@
           Math.exp(
             -Math.pow(
               pressDifference /
-                0.58,
+                0.52,
               2
             )
           ) *
-          bubble.pressAmount *
-          CONFIG.maxPressDeformation;
+          dynamicCompression;
 
-        // Wybrzuszenie po przeciwnej stronie.
-        const oppositePressDifference =
+        /*
+         * Wybrzuszenie po przeciwnej stronie.
+         */
+        const backDifference =
           angleDifference(
             angle,
             pressAngle +
               Math.PI
           );
 
-        const pressBulge =
+        const backBulge =
           Math.exp(
             -Math.pow(
-              oppositePressDifference /
-                1.05,
+              backDifference /
+                0.94,
               2
             )
           ) *
           bubble.pressAmount *
-          0.08;
+          (
+            0.12 +
+            bubble.insideDepth *
+              0.1
+          );
 
-        // Delikatna deformacja przy zderzeniu.
+        /*
+         * Rozpychanie obu boków,
+         * podobnie jak w miękkim balonie.
+         */
+        const sideDifferenceA =
+          angleDifference(
+            angle,
+            pressAngle +
+              Math.PI / 2
+          );
+
+        const sideDifferenceB =
+          angleDifference(
+            angle,
+            pressAngle -
+              Math.PI / 2
+          );
+
+        const sideBulge =
+          (
+            Math.exp(
+              -Math.pow(
+                sideDifferenceA /
+                  0.72,
+                2
+              )
+            ) +
+            Math.exp(
+              -Math.pow(
+                sideDifferenceB /
+                  0.72,
+                2
+              )
+            )
+          ) *
+          bubble.pressAmount *
+          (
+            0.055 +
+            bubble.insideDepth *
+              0.08
+          );
+
+        /*
+         * Minimalne zwiększenie objętości
+         * podczas mocnego nacisku.
+         */
+        const volumeCompensation =
+          bubble.pressAmount *
+          bubble.insideDepth *
+          0.035;
+
         const collisionDifference =
           angleDifference(
             angle,
@@ -1115,9 +1450,11 @@
           bubble.radius *
           naturalWobble *
           (
-            1 -
+            1 +
+            volumeCompensation -
             pressDent +
-            pressBulge -
+            backBulge +
+            sideBulge -
             collisionDent +
             collisionBulge
           );
@@ -1154,17 +1491,21 @@
       const aura =
         context.createRadialGradient(
           bubble.x -
-            bubble.radius * 0.18,
+            bubble.radius *
+              0.18,
 
           bubble.y -
-            bubble.radius * 0.2,
+            bubble.radius *
+              0.2,
 
-          bubble.radius * 0.08,
+          bubble.radius *
+            0.08,
 
           bubble.x,
           bubble.y,
 
-          bubble.radius * 1.42
+          bubble.radius *
+            1.42
         );
 
       aura.addColorStop(
@@ -1192,7 +1533,8 @@
         "rgba(89, 179, 235, 0)"
       );
 
-      context.fillStyle = aura;
+      context.fillStyle =
+        aura;
 
       context.beginPath();
 
@@ -1211,14 +1553,9 @@
       bubble,
       time
     ) {
-      drawOuterAura(bubble);
-
-      const movementAngle =
-        Math.atan2(
-          bubble.velocityY,
-          bubble.velocityX ||
-            0.0001
-        );
+      drawOuterAura(
+        bubble
+      );
 
       context.save();
 
@@ -1228,24 +1565,33 @@
       );
 
       context.rotate(
-        movementAngle
+        bubble.rotation
       );
 
       createBubblePath(
         bubble,
-        time,
-        movementAngle
+        time
       );
 
       const bodyGradient =
         context.createRadialGradient(
-          -bubble.radius * 0.34,
-          -bubble.radius * 0.4,
-          bubble.radius * 0.02,
+          -bubble.radius *
+            0.34,
 
-          bubble.radius * 0.04,
-          bubble.radius * 0.08,
-          bubble.radius * 1.16
+          -bubble.radius *
+            0.4,
+
+          bubble.radius *
+            0.02,
+
+          bubble.radius *
+            0.04,
+
+          bubble.radius *
+            0.08,
+
+          bubble.radius *
+            1.16
         );
 
       bodyGradient.addColorStop(
@@ -1283,23 +1629,34 @@
         "rgba(74, 165, 224, 0.2)";
 
       context.shadowBlur =
-        bubble.radius * 0.28;
+        bubble.radius *
+        0.28;
 
-      // Tylko wypełnienie — brak obramowania.
       context.fill();
 
       context.shadowBlur = 0;
 
-      // Jasne odbicie wewnątrz.
+      /*
+       * Jasne odbicie wewnątrz.
+       */
       const innerLight =
         context.createRadialGradient(
-          -bubble.radius * 0.34,
-          -bubble.radius * 0.4,
+          -bubble.radius *
+            0.34,
+
+          -bubble.radius *
+            0.4,
+
           0,
 
-          -bubble.radius * 0.25,
-          -bubble.radius * 0.3,
-          bubble.radius * 0.48
+          -bubble.radius *
+            0.25,
+
+          -bubble.radius *
+            0.3,
+
+          bubble.radius *
+            0.48
         );
 
       innerLight.addColorStop(
@@ -1323,11 +1680,17 @@
       context.beginPath();
 
       context.ellipse(
-        -bubble.radius * 0.3,
-        -bubble.radius * 0.34,
+        -bubble.radius *
+          0.3,
 
-        bubble.radius * 0.23,
-        bubble.radius * 0.12,
+        -bubble.radius *
+          0.34,
+
+        bubble.radius *
+          0.23,
+
+        bubble.radius *
+          0.12,
 
         -0.38,
         0,
@@ -1336,16 +1699,28 @@
 
       context.fill();
 
-      // Niebieska refrakcja w dolnej części.
+      /*
+       * Niebieska refrakcja
+       * w dolnej części.
+       */
       const lowerRefraction =
         context.createRadialGradient(
-          bubble.radius * 0.22,
-          bubble.radius * 0.34,
+          bubble.radius *
+            0.22,
+
+          bubble.radius *
+            0.34,
+
           0,
 
-          bubble.radius * 0.2,
-          bubble.radius * 0.28,
-          bubble.radius * 0.78
+          bubble.radius *
+            0.2,
+
+          bubble.radius *
+            0.28,
+
+          bubble.radius *
+            0.78
         );
 
       lowerRefraction.addColorStop(
@@ -1369,11 +1744,17 @@
       context.beginPath();
 
       context.ellipse(
-        bubble.radius * 0.12,
-        bubble.radius * 0.22,
+        bubble.radius *
+          0.12,
 
-        bubble.radius * 0.72,
-        bubble.radius * 0.55,
+        bubble.radius *
+          0.22,
+
+        bubble.radius *
+          0.72,
+
+        bubble.radius *
+          0.55,
 
         0.2,
         0,
@@ -1383,6 +1764,7 @@
       context.fill();
 
       context.restore();
+
       context.globalAlpha = 1;
     }
 
@@ -1392,7 +1774,9 @@
       );
 
       if (animationPaused) {
-        lastFrameTime = timestamp;
+        lastFrameTime =
+          timestamp;
+
         return;
       }
 
@@ -1424,7 +1808,8 @@
         2.2
       );
 
-      lastFrameTime = timestamp;
+      lastFrameTime =
+        timestamp;
 
       updatePointerVelocity();
 
@@ -1442,8 +1827,10 @@
         }
       );
 
-      // Dwa przejścia pomagają, gdy kilka
-      // bąbelków zderza się jednocześnie.
+      /*
+       * Dwa przejścia stabilizują sytuację,
+       * gdy kilka bąbelków zderza się naraz.
+       */
       resolveBubbleCollisions();
       resolveBubbleCollisions();
 
